@@ -6,11 +6,15 @@
 CPP_SRCS += \
 ../CBlueTooth.cpp \
 ../CFroniusProbe.cpp \
-../CInterface.cpp \
 ../CLog.cpp \
 ../CModbusMTU.cpp \
 ../CMysqlDb.cpp \
 ../CScanner.cpp \
+../CSerial.cpp \
+../CSettings.cpp \
+../CSmaProbe.cpp \
+../CSocket.cpp \
+../CSolutronicProbe.cpp \
 ../CSunergyProbe.cpp \
 ../CXMLDb.cpp \
 ../fpd.cpp 
@@ -18,11 +22,15 @@ CPP_SRCS += \
 OBJS += \
 ./CBlueTooth.o \
 ./CFroniusProbe.o \
-./CInterface.o \
 ./CLog.o \
 ./CModbusMTU.o \
 ./CMysqlDb.o \
 ./CScanner.o \
+./CSerial.o \
+./CSettings.o \
+./CSmaProbe.o \
+./CSocket.o \
+./CSolutronicProbe.o \
 ./CSunergyProbe.o \
 ./CXMLDb.o \
 ./fpd.o 
@@ -30,11 +38,15 @@ OBJS += \
 CPP_DEPS += \
 ./CBlueTooth.d \
 ./CFroniusProbe.d \
-./CInterface.d \
 ./CLog.d \
 ./CModbusMTU.d \
 ./CMysqlDb.d \
 ./CScanner.d \
+./CSerial.d \
+./CSettings.d \
+./CSmaProbe.d \
+./CSocket.d \
+./CSolutronicProbe.d \
 ./CSunergyProbe.d \
 ./CXMLDb.d \
 ./fpd.d 
