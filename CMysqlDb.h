@@ -15,30 +15,28 @@
 #include "tinyxml/tinyxml2.h"
 #include <iostream>
 #include <string>
+#include <mysql/mysql.h>
+#include <mysql/errmsg.h>
+
 using namespace std;
-using namespace tinyxml2;
 
 #define INSERT_PER_QUERY 10
 
-class CMysqlDb {
+class CMysqlDb : public COutput
+{
 public:
-	CMysqlDb();
+	CMysqlDb(map<string, string> settings);
 	virtual ~CMysqlDb();
 	// Database connection functions
-	int Connect(char *host, unsigned int port, char *user, char *pass, char *db);
+	int Connect(void);
 
 	// Database insertion functions
 	int Insert(DataContainer &Data);
 	int Insert(DataContainerList &DataList);
 
-	int InsertStatic(uint8_t inverter, uint8_t *verString, uint8_t DeviceType, uint8_t Capabilities, uint32_t serial);
-
-	// In case of error, backup to XML
-	int BackupDynamic(struct PollStruct &polldata);
-	// In case of resolve of the error, restore from XML
-	int RestoreDynamic(void);
-
-	int Test(void);
+	int Restore(DataContainer &Data) {return false;};
+	// Restore multiple rows
+	int Restore(DataContainerList &DataList, unsigned int maxRows) {return false;};
 
 private:
 
@@ -46,11 +44,11 @@ private:
 
 
 	MYSQL			m_conn;
-	char 			*m_host;
-	unsigned int	m_port;
-	char			*m_user;
-	char			*m_pass;
-	char			*m_db;
+	string 			m_host;
+	uint16_t		m_port;
+	string			m_user;
+	string			m_pass;
+	string			m_db;
 };
 
 #endif /* CMysqlDb_H_ */
