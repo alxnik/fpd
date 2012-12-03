@@ -17,12 +17,13 @@
 using namespace tinyxml2;
 using namespace std;
 
-class CXMLDb {
+class CXMLDb : public COutput
+{
 public:
-	CXMLDb();
+	CXMLDb(map<string, string> settings);
 	virtual ~CXMLDb();
 
-	int Connect(string FileName);
+	int Connect(void);
 
 	// Insert one row
 	int Insert(DataContainer &Data);

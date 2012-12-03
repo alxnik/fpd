@@ -10,18 +10,20 @@
 
 #include "CXMLDb.h"
 
-CXMLDb::CXMLDb() {
+CXMLDb::CXMLDb(map<string, string> settings)
+{
+	m_FileName = settings["filename"];
 	m_BackupFile = 0;
 	pthread_mutex_init(&FileMutex, NULL);
 }
 
-CXMLDb::~CXMLDb() {
+CXMLDb::~CXMLDb()
+{
 }
 
 int
-CXMLDb::Connect(string FileName) {
-
-	m_FileName = FileName;
+CXMLDb::Connect(void)
+{
 	return LoadBackupFile();
 }
 
@@ -71,6 +73,11 @@ CXMLDb::Insert(DataContainerList &DataList)
 
 	pthread_mutex_unlock(&FileMutex);
 	return true;
+}
+int
+CXMLDb:: Restore(DataContainer &Data)
+{
+	return false; // not implemented
 }
 
 // Restores the cached entries to the database. It's spawned off as a seperate
