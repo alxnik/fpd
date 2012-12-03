@@ -11,7 +11,6 @@
 #include "CFroniusProbe.h"
 #include "errno.h"
 
-extern CLog Logger;
 
 CFroniusProbe::CFroniusProbe(CInterface *SerialLine, string uuid)
 {
@@ -133,7 +132,7 @@ CFroniusProbe::GetAverage(DataContainer &AverageData)
 
 	if(m_MsgQueue.size() == 0)
 	{
-		syslog(LOG_ERR, "Possible bug. Empty list received\n");
+		syslog(LOG_ERR, "No messages in Queue\n");
 		return false;
 	}
 
@@ -455,7 +454,7 @@ CFroniusProbe::ReceivingFunction(void *ptr)
 	struct ThreadStruct args;
 	memcpy(&args, ptr, sizeof(struct ThreadStruct));
 
-	CInterface Interface = *(args.interface);
+	CInterface *Interface = args.interface;
 
 
 	uint8_t CurrentMessage[512];
@@ -468,9 +467,9 @@ CFroniusProbe::ReceivingFunction(void *ptr)
 	while(true)
 	{
 		// Read from serial
-		if(!Interface.Receive(&in, 1))
+		if(!Interface->Receive(&in, 1, 1))
 		{
-			syslog(LOG_ERR, "Error Reading from Serial Line\n");
+			syslog(LOG_ERR, "Error Reading from Interface\n");
 			sleep(1);
 			continue;
 		}
@@ -525,7 +524,7 @@ CFroniusProbe::ReceivingFunction(void *ptr)
 				if(debugFlag == true)
 				{
 					//syslog(LOG_INFO, "Message Received:\n");
-					//Logger.hexDump(CurrentMessage, MsgPtr);
+					//Log.hexDump(LOG_DEBUG, CurrentMessage, MsgPtr);
 				}
 
 				// Push the message back to the message queue
@@ -533,7 +532,7 @@ CFroniusProbe::ReceivingFunction(void *ptr)
 				msg.DataLen = MsgPtr;
 				memcpy((void *)msg.Data, CurrentMessage, MsgPtr);
 				msg.TimeStamp = time(NULL);
-				msg.Iface = &Interface;
+				msg.Iface = Interface;
 
 				pthread_mutex_lock(args.queueMutex);
 				args.MsgQueue->push_back(msg);
@@ -593,7 +592,7 @@ CFroniusProbe::SendMessage(CInterface *interface, uint8_t Command, uint8_t netwo
 	if(debugFlag == true)
 	{
 		//syslog(LOG_INFO, "Sending msg:\n");
-		//Logger.hexDump(message, ptr);
+		//Log.hexDump(LOG_DEBUG, message, ptr);
 	}
 
 	if(!interface->Send(message, ptr))

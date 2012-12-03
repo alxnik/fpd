@@ -8,31 +8,12 @@
 
  */
 
-#ifndef CPROBE_H_
-#define CPROBE_H_
+#ifndef CFRONIUSPROBE_H_
+#define CFRONIUSPROBE_H_
 #include "fpd.h"
 #include "CLog.h"
-#include "CInterface.h"
+#include "CSerial.h"
 using namespace std;
-
-
-struct MsgStruct
-{
-	uint8_t 	Data[128];		// Message data
-	uint16_t 	DataLen;		// Message length
-	uint32_t 	TimeStamp;	// Timestamp of message arrival
-	CInterface 	*Iface;		// The serial interface that received the message
-};
-
-struct ThreadStruct
-{
-	CInterface *interface;
-	list<struct MsgStruct> *MsgQueue;
-	pthread_mutex_t *queueMutex;
-
-	list<int> *connected;
-};
-
 
 class CFroniusProbe : public CProbe
 {
