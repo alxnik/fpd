@@ -9,8 +9,7 @@
  */
 
 #include "CLog.h"
-#include "fpd.h"
-#include <syslog.h>
+#include <stdarg.h>
 
 CLog::CLog()
 {
@@ -31,9 +30,54 @@ CLog::~CLog()
 }
 
 void
-CLog::hexDump(uint8_t *msg, int len)
+CLog::hexDump(int priority, uint8_t *msg, int len)
 {
-	for(int i=0; i<len; i++)
-		fprintf(stderr, "[%x]", *(msg+i));
-	fprintf(stderr, "\n");
+    uint8_t AsciiBuff[2048];
+    memset(AsciiBuff, 0x0, sizeof(AsciiBuff));
+    int p = 0;
+    for(int i=0; i<len; i++)
+    {
+            sprintf((char *) &AsciiBuff[p], "%02x ", *(msg+i));
+            p = strlen((char *) AsciiBuff);
+            if(i > 0 && i % 0x10 == 0)
+                    sprintf((char *) &AsciiBuff[p], "\n");
+            p = strlen((char *) AsciiBuff);
+    }
+    syslog(priority, "\n%s\n", AsciiBuff);
+}
+
+void
+CLog::error(const char *format, ...)
+{
+	va_list ap;
+	va_start ( ap, format );
+	vsyslog(LOG_ERR, format, ap);
+	va_end(ap);
+}
+
+void
+CLog::warn(const char *format, ...)
+{
+	va_list ap;
+	va_start ( ap, format );
+	vsyslog(LOG_WARNING, format, ap);
+	va_end(ap);
+}
+
+void
+CLog::log(const char *format, ...)
+{
+	va_list ap;
+	va_start ( ap, format );
+	vsyslog(LOG_INFO, format, ap);
+	va_end(ap);
+}
+
+void
+CLog::debug(const char *format, ...)
+{
+	va_list ap;
+	va_start ( ap, format );
+	vsyslog(LOG_DEBUG, format, ap);
+	va_end(ap);
 }

@@ -11,7 +11,33 @@
 #ifndef CLOG_H_
 #define CLOG_H_
 
-#include "fpd.h"
+#include <sys/types.h>
+#include <syslog.h>
+//#include "fpd.h"
+
+#include <stdio.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdint.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+#include <termios.h>
+#include <signal.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <signal.h>
+
+#include <list>
+#include <map>
+#include <string>
+#include <sstream>
+using namespace std;
+
+extern bool debugFlag;
 
 class CLog {
 public:
@@ -19,7 +45,13 @@ public:
 	~CLog();
 
 	void Init(void);
-	void hexDump(uint8_t *msg, int len);
+	void hexDump(int priority, uint8_t *msg, int len);
+
+	void error(const char *format, ...);
+	void warn(const char *format, ...);
+	void log(const char *format, ...);
+	void debug(const char *format, ...);
 };
 
 #endif /* CLOG_H_ */
+
