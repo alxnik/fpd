@@ -9,7 +9,6 @@
  */
 
 #include "CSunergyProbe.h"
-extern bool SigTermFlag;
 
 CSunergyProbe::CSunergyProbe(CModbusMTU *Modbus, string uuid)
 {
