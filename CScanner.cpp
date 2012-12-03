@@ -10,8 +10,6 @@
 
 #include "CScanner.h"
 
-extern bool SigTermFlag;
-
 CScanner::CScanner() {
 }
 
@@ -26,7 +24,7 @@ CScanner::FindNetwork(void)
 	list<int> BlueDevices = EnumBlueTooth();
 	syslog(LOG_INFO, "Found %lu Bluetooth Adapters", BlueDevices.size());
 
-//	ActiveProbe = FindSMABlueTooth(BlueDevices);
+	ActiveProbe = FindSMABlueTooth(BlueDevices);
 
 	if(ActiveProbe)
 		return ActiveProbe;
@@ -43,11 +41,11 @@ CScanner::FindNetwork(void)
 	if(ActiveProbe)
 		return ActiveProbe;
 
-	if(SigTermFlag == true)
-		return 0;
-
 	syslog(LOG_INFO, "Scanning for Sunergy\n");
 	ActiveProbe = FindSunergy(SerialPorts);
+	
+	if(SigTermFlag == true)
+		return 0;
 
 	return ActiveProbe;
 }
@@ -57,7 +55,7 @@ CScanner::FindSunergy(list<string> &SerialPorts)
 {
 	for (list<string>::iterator Send = SerialPorts.begin(); Send != SerialPorts.end(); Send++)
 	{
-		for(speed_t spd = B19200; spd<=B19200; spd++)
+		for(speed_t spd = B2400; spd<=B19200; spd++)
 		{
 			if(SigTermFlag == true)
 				return 0;
@@ -88,7 +86,7 @@ CScanner::FindSunergy(list<string> &SerialPorts)
 				delete(SerialLine);
 				continue;
 			}
-			CSunergyProbe *CurrProbe = new CSunergyProbe(SerialLine, UUID);
+			CSunergyProbe *CurrProbe = new CSunergyProbe(SerialLine, "12345");
 			if(!CurrProbe->Start())
 			{
 				delete(CurrProbe);
@@ -118,7 +116,7 @@ CScanner::FindFronius(list<string> &SerialPorts)
 
 			for(speed_t spd = B2400; spd<=B19200; spd++)
 			{
-				CInterface *SerialLine = new CInterface(*Send, spd, *Receive, spd);
+				CSerial *SerialLine = new CSerial(*Send, spd, *Receive, spd);
 
 				if(debugFlag == true)
 				{
@@ -148,7 +146,7 @@ CScanner::FindFronius(list<string> &SerialPorts)
 					delete(SerialLine);
 					continue;
 				}
-				CFroniusProbe *CurrProbe = new CFroniusProbe(SerialLine, UUID);
+				CFroniusProbe *CurrProbe = new CFroniusProbe(dynamic_cast<CInterface *>(SerialLine), "12345");
 				if(!CurrProbe->Start())
 				{
 					delete(CurrProbe);
@@ -186,7 +184,7 @@ CScanner::FindSMABlueTooth(list<int> &BlueDevices)
 	    if (sock < 0)
 	    {
 	        perror("opening socket");
-	        exit(1);
+	        return 0;
 	    }
 	    len  = 8;
 	    max_rsp = 255;
@@ -205,13 +203,34 @@ CScanner::FindSMABlueTooth(list<int> &BlueDevices)
 	        	strcpy(name, "[unknown]");
 
 	        if(strstr(name, "SMA"))
-	        {
-	        	printf("Found SMA at: [%s]  (%s)\n", addr, name);
-	        }
+	        	syslog(LOG_INFO, "Found SMA at: [%s]  (%s) - hci%d\n", addr, name, dev_id);
 	    }
 
-	    free( ii );
 	    close( sock );
+	    free( ii );
+
+	    // Sleep while the bt stack cleans up the whole scanning
+	    // thing before trying to connect or it gives an error
+		sleep(3);
+	    CBlueTooth *BtConnx;//= new CBlueTooth(addr);
+		if(!BtConnx->Connect())
+		{
+			syslog(LOG_INFO, "cannot connect to %s\n", addr);
+			delete(BtConnx);
+			continue;
+		}
+		else
+			syslog(LOG_INFO, "Connected to %s\n", addr);
+
+		CSmaProbe *CurrProbe = new CSmaProbe(BtConnx, "12345");
+		if(!CurrProbe->Start())
+		{
+			delete(CurrProbe);
+			usleep(10000);
+			continue;
+		}
+		else
+			return dynamic_cast<CProbe *>(CurrProbe);
 	}
 
 	return 0;
@@ -275,6 +294,14 @@ CScanner::EnumSerialPorts(void)
 			{
 				syslog(LOG_INFO, "Found Atmel AT91 / AT32 Serial on %s\n", PortPath.c_str());
 				PortList.push_back(PortPath);
+			}
+			else if(!strcmp(driver, "serial"))
+			{
+				if(udev_device_get_subsystem(dev) && !strcmp(udev_device_get_subsystem(dev), "pnp"))
+				{
+					syslog(LOG_INFO, "Found 16550A Serial on %s\n", PortPath.c_str());
+					PortList.push_back(PortPath);
+				}
 			}
 		}
 

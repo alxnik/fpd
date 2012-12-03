@@ -13,7 +13,10 @@
 
 #include "CFroniusProbe.h"
 #include "CSunergyProbe.h"
+#include "CSmaProbe.h"
+
 #include "CModbusMTU.h"
+#include "CBlueTooth.h"
 
 #include <libudev.h>
 #include <stdio.h>
