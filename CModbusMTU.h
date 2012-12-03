@@ -11,7 +11,7 @@
 #ifndef CMODBUSMTU_H_
 #define CMODBUSMTU_H_
 #include "fpd.h"
-#include "CInterface.h"
+#include "CSerial.h"
 
 #include "libmodbus/modbus.h"
 #include <errno.h>

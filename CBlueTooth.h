@@ -21,25 +21,27 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <errno.h>
 
 
-class CBlueTooth {
+class CBlueTooth : public CInterface
+{
 public:
-	CBlueTooth(string device, string host);
+	CBlueTooth(map<string, string> settings);
 	virtual ~CBlueTooth();
 
-	int	Connect(void);
-	int Disconnect(void);
+	int				Connect(void);
+	int 			Disconnect(void);
 
-	int Send(uint8_t *message, int length);
-	int Receive(uint8_t *message, int length);
+	int 			Send(uint8_t *message, int length);
+	int 			Receive(uint8_t *message, int length, time_t timeout);
+	const bdaddr_t*	GetLocalMac(void);
 private:
 
-	string m_device;
-	string m_host;
-	bool m_IsConnected;
-
-	int m_Socket;
+	string 		m_host;
+	bool 		m_IsConnected;
+	bdaddr_t 	m_LocalAddr;
+	int 		m_Socket;
 };
 
 #endif /* CBLUETOOTH_H_ */

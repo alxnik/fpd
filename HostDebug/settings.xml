@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<fpd>
+	<inputs>
+		<input UUID="1234" type="fronius">
+			<iface type="serial">
+				<port>auto</port>
+				<speed>auto</speed>
+			</iface>
+			<sensors>
+				<sensor address="1"/>
+				<sensor address="2"/>
+				<sensor address="3"/>
+				<sensor address="4"/>
+				<sensor address="5"/>
+				<sensor address="6"/>
+				<sensor address="7"/>
+				<sensor address="8"/>
+			</sensors>
+			<outputs>
+				<output name="mysql" priority="1"/>
+				<output name="xml" priority="2"/>
+			</outputs>
+		</input>
+
+                <input UUID="4321" type="solutronic">
+			<iface type="socket">
+				<host>172.16.0.5</host>
+				<port>1234</port>
+			</iface>
+                        <sensors>
+                                <sensor address="1234"/>
+                        </sensors>
+                </input>
+	</inputs>
+	
+	<outputs>
+		<output name="mysql" type="mysql">
+			<host></host>
+			<port></port>
+			<username></username>
+			<password></password>
+		</output>
+
+		<output name="xml" type="xml">
+			<filename>backup.xml</filename>
+		</output>
+	</outputs>
+</fpd>
