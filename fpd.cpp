@@ -12,20 +12,21 @@
 #include "CMysqlDb.h"
 #include "CXMLDb.h"
 #include "CLog.h"
-#include "CInterface.h"
+#include "CSerial.h"
+#include "CSocket.h"
 #include "CScanner.h"
+#include "CSolutronicProbe.h"
+#include "CSettings.h"
+#include "CSmaProbe.h"
 
+#include <signal.h>
+
+CLog Log;
 bool debugFlag = false;
-CLog Logger;
-
-
 bool SigTermFlag = false;
 
 pthread_t RestoringThread;
 pthread_t DbConnectThread;
-
-void* RestoringFunction(void *ptr);
-void* DbConnectFunction(void *ptr);
 
 bool RestoringFinished;
 
@@ -45,6 +46,91 @@ void handler(int value)
 }
 
 
+
+COutput* StartOutput(OutputContainer *outp)
+{
+
+	COutput *out = 0;
+	if(outp->type.compare("mysql"))
+	{
+		CMysqlDb *Mysql = new CMysqlDb(outp->settings);
+		Mysql->Connect();
+		out = dynamic_cast<COutput *> (Mysql);
+	}
+	else if(outp->type.compare("xml"))
+	{
+		CXMLDb *xml = new CXMLDb(outp->settings);
+		xml->Connect();
+		out = dynamic_cast<COutput *> (xml);
+	}
+	else
+	{
+		syslog(LOG_ERR, "Unsupported output requested\n");
+	}
+
+	return out;
+}
+
+
+CInterface* StartInterface(InputContainer *inp)
+{
+	CInterface *iface = 0;
+
+	if(!inp->iface.compare("serial"))
+	{
+		CSerial *Serial = new CSerial(inp->ifaceSettings);
+		iface = dynamic_cast<CInterface *> (Serial);
+	}
+	else if(!inp->iface.compare("socket"))
+	{
+		CSocket *sock = new CSocket(inp->ifaceSettings);
+		iface = dynamic_cast<CInterface *> (sock);
+	}
+	else if(!inp->iface.compare("bluetooth"))
+	{
+		CBlueTooth *bt = new CBlueTooth(inp->ifaceSettings);
+		iface = dynamic_cast<CInterface *> (bt);
+	}
+	else
+	{
+		syslog(LOG_ERR, "Unsupported Interface requested\n");
+	}
+
+	return iface;
+}
+
+CProbe* StartProbe(InputContainer *inp, CInterface* iface)
+{
+	CProbe *Probe = 0;
+	if(!inp->type.compare("fronius"))
+	{
+		CFroniusProbe *FProbe = new CFroniusProbe(iface, inp->uuid);
+		Probe = dynamic_cast<CProbe *> (FProbe);
+	}
+	else if(!inp->type.compare("sunergy"))
+	{
+		//CSunergyProbe *SProbe = new CSunergyProbe(iface, CurInput->uuid);
+		//Probe = dynamic_cast<CProbe *> (SProbe);
+	}
+	else if(!inp->type.compare("sma"))
+	{
+		//CSmaProbe *SProbe = new CSmaProbe(iface, CurInput->uuid);
+		//Probe = dynamic_cast<CProbe *> (SProbe);
+	}
+	else if(!inp->type.compare("solutronic"))
+	{
+		CSolutronicProbe *SProbe = new CSolutronicProbe(iface, inp->sensors, inp->uuid);
+		Probe = dynamic_cast<CProbe *> (SProbe);
+	}
+	else
+	{
+		syslog(LOG_ERR, "Unsupported Probe requested\n");
+	}
+
+	return Probe;
+}
+
+
 int main(int argc, char *argv[])
 {
 	pid_t sid;
@@ -59,7 +145,7 @@ int main(int argc, char *argv[])
     		debugFlag = true;
     }
 
-    Logger.Init();
+    Log.Init();
 
     // VER is set by the makefile and contains the svn revision number
 #ifdef VER
@@ -107,216 +193,60 @@ int main(int argc, char *argv[])
     	return(EXIT_FAILURE);
     }
 
+
     // Now start the actual application
+    CSettings Settings;
 
-    // Mysql Connection object
-	CMysqlDb SolarSpyDb;
-	// XML Connection object. Used for local caching if mysql fails
-	CXMLDb BackupDb;
+    if(!Settings.LoadFile("settings.xml"))
+    {
+        syslog(LOG_ERR, "Error reading settings\n");
+		return(EXIT_FAILURE);
+    }
 
-	string path = stripPathFromArgv(argv[0]);
-	path = path + "/" + "backup.xml";
-	BackupDb.Connect(path);
-
-	RestoringThread = 0;
-	DbConnectThread = 0;
-	RestoringFinished = true;
-
-	// If we connect, then everything is ok, libmysql handles reconnections automatically.
-	// If we don't connect, we have to spawn a thread to keep trying reconnecting
-
-	char host[] = HOST;
-	int	 port = PORT;
-	char user[] = USER;
-	char pass[] = PASS;
-	char db[] = DB;
+    syslog(LOG_INFO, "Loaded Settings file\n");
+    list<CProbe*> Inputs;
+    list<COutput*> Outputs;
 
 
-	RestoreThreadStruct ThreadStruct;
-	ThreadStruct.MysqlDb = &SolarSpyDb;
-	ThreadStruct.XMLDb = &BackupDb;
-
-	if(!SolarSpyDb.Connect(host, port, user, pass, db))
+    // Parse and start the outputs
+	for(list<OutputContainer>::iterator CurOutput=Settings.OutputsDB.begin();CurOutput!=Settings.OutputsDB.end(); ++CurOutput)
 	{
-		syslog(LOG_ERR, "Error Connecting to database %s on %s:%d",db, host, port);
-		pthread_create( &DbConnectThread, NULL, &DbConnectFunction,  &SolarSpyDb);
-	}
-	else
-	{
-		syslog(LOG_INFO, "Connected to database %s on %s:%d",db, host, port);
-
-
-
-		// Start restoring any backup data
-		syslog(LOG_INFO, "Uploading any pending data...");
-		pthread_create( &RestoringThread, NULL, &RestoringFunction,  &ThreadStruct);
-		if(debugFlag == true)
-			syslog(LOG_INFO, "Restoring Thread started\n");
-	}
-
-	CScanner Scanner;
-	CProbe *probe;
-
-	// Send the scanner to find a network of probes and return a live probe
-	while((probe = Scanner.FindNetwork()) == 0)
-	{
-		syslog(LOG_ERR, "Cannot Find Any Inverter Network. Sleeping for 10 secs");
-
-		for(int w=0; w < 10; w++)
+		COutput *out = StartOutput(&(*CurOutput));
+		if(out)
+			Outputs.push_back(out);
+		else
 		{
-			if(SigTermFlag == true)
-						return 0;
-			sleep(1);
+			syslog(LOG_ERR, "Failed to start output [%s]\n", CurOutput->name.c_str());
+			continue;
 		}
 	}
 
-	syslog(LOG_INFO, "Initialized Successfully");
-
-	map<int, int> ConsecutiveErrors;
-
-	while(true)
+    // Parse and start the inputs
+	for(list<InputContainer>::iterator CurInput=Settings.InputsDB.begin();CurInput!=Settings.InputsDB.end(); ++CurInput)
 	{
-		bool DBState = true;
-		time_t TimeStamp = time(NULL);
-		struct tm *ptr;
-		ptr = localtime((const time_t *) &TimeStamp);
+		// Start The interface first
+		CInterface *iface = StartInterface(&(*CurInput));
 
-		if(ptr->tm_sec == 0)
+		if(!iface || !iface->Connect())
 		{
-
-			list<int> ConnectedProbes;
-			ConnectedProbes = probe->GetConnectedInverters();
-
-			list<int>::iterator currentProbe;
-			for(currentProbe=ConnectedProbes.begin();currentProbe!=ConnectedProbes.end(); ++currentProbe)
-			{
-				DataContainer Results;
-
-				Results["clientID"] = UUID;
-				Results["TimeStamp"] = int2string(TimeStamp);
-				Results["inverter"] = int2string(*currentProbe);
-
-				// By default, start with non-responsive status and work the way from there
-				Results["status"] = "5";
-
-				if(!ConsecutiveErrors[*currentProbe])
-					ConsecutiveErrors[*currentProbe] = 0;
-
-				// Try to get the probe results.
-				// If it fails, flag it as non responsive (and discard it...)
-				// On 5 errors send it to db anyway
-
-				if(probe->GetAverage(Results) == false)
-				{
-					syslog(LOG_ERR, "Non responsive Inverter\n");
-					ConsecutiveErrors[*currentProbe]++;
-				}
-				else
-					ConsecutiveErrors[*currentProbe] = 0;
-
-				if(ConsecutiveErrors[*currentProbe] == 0 || ConsecutiveErrors[*currentProbe] > 5)
-				{
-					// If the last db access returned an error, send it straight to
-					// backup and don't lose time trying again. Will try again on next
-					// probe
-					if(DBState == true && SolarSpyDb.Insert(Results))
-					{
-
-							// If we had a successful database insertion, the reconnect thread did its job.
-							// Stop it...
-							if(DbConnectThread)
-							{
-								pthread_cancel(DbConnectThread);
-								DbConnectThread = 0;
-							}
-
-							if(RestoringFinished == true)
-							{
-								if(RestoringThread)
-								{
-									pthread_join(RestoringThread, NULL);
-									RestoringThread = 0;
-								}
-								pthread_create( &RestoringThread, NULL, &RestoringFunction,  &ThreadStruct);
-								if(debugFlag == true)
-									syslog(LOG_INFO, "Restoring Thread started\n");
-							}
-
-							DBState = true;
-					}
-					else
-					{
-						syslog(LOG_ERR, "Error Inserting data to solarspy\n");
-
-						DBState = false;
-
-						if(!BackupDb.Insert(Results))
-							syslog(LOG_ERR, "Error inserting data to XML\n");
-					}
-				}
-			}
-			probe->ResetStack();
-			sleep(1);
+			syslog(LOG_ERR, "Failed to start interface [%s]\n", CurInput->uuid.c_str());
+			continue;
 		}
-		usleep(30000);
-		if(SigTermFlag == true)
-			break;
-	}
 
-	pthread_join(RestoringThread, NULL);
-	delete probe;
+		// And pass it to the probe
+		CProbe *Probe = StartProbe(&(*CurInput),iface);
+		if(!Probe || !Probe->Start())
+		{
+			syslog(LOG_ERR, "Failed to start probe [%s]\n", CurInput->uuid.c_str());
+			delete iface;
+			continue;
+		}
+	}
+	sleep(5);
+
 	return 0;
 }
 
-void* RestoringFunction(void *ptr)
-{
-	RestoringFinished = false;
-	RestoreThreadStruct *ThreadStruct = (RestoreThreadStruct *) ptr;
-
-	while(true)
-	{
-		DataContainerList Data2Restore;
-
-		if(ThreadStruct->XMLDb->Restore(Data2Restore, 100) == false)
-		{
-			syslog(LOG_ERR, "Error Reading from XML file\n");
-			break;
-		}
-
-		if(Data2Restore.size() == 0)
-			break;
-
-		if(ThreadStruct->MysqlDb->Insert(Data2Restore) == false)
-		{
-			syslog(LOG_ERR, "Error Inserting data to database\n");
-			break;
-		}
-	}
-
-	RestoringFinished = true;
-	pthread_exit(NULL);
-
-	return NULL;
-}
-
-void* DbConnectFunction(void *ptr)
-{
-	char host[] = HOST;
-	char user[] = USER;
-	char pass[] = PASS;
-	char db[] = DB;
-
-	CMysqlDb *RestoreDb = (CMysqlDb *) ptr;
-	if(!RestoreDb->Connect(host, 65020, user, pass, db))
-	{
-		sleep(30);
-		syslog(LOG_INFO, "Trying to connect to db\n");
-	}
-	syslog(LOG_INFO, "Connected to db\n");
-	pthread_exit(NULL);
-
-	return NULL;
-}
 
 string int2string(uint8_t num)
 {
