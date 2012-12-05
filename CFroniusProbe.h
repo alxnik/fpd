@@ -19,6 +19,7 @@ class CFroniusProbe : public CProbe
 {
 public:
 	CFroniusProbe(CInterface *SerialLine, string uuid);
+	CFroniusProbe(CInterface *SerialLine, list<int> sensors, string uuid);
 	virtual ~CFroniusProbe();
 
 	int Start(void);

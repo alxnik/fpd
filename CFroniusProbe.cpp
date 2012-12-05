@@ -20,6 +20,16 @@ CFroniusProbe::CFroniusProbe(CInterface *SerialLine, string uuid)
 	pthread_mutex_init(&m_queueMutex, NULL);
 }
 
+CFroniusProbe::CFroniusProbe(CInterface *SerialLine, list<int> sensors, string uuid)
+{
+	m_Interface = SerialLine;
+	m_SendingThread = m_ReceivingThread = 0;
+
+	m_connected = sensors;
+
+	pthread_mutex_init(&m_queueMutex, NULL);
+}
+
 CFroniusProbe::~CFroniusProbe()
 {
 	Stop();
@@ -77,10 +87,13 @@ CFroniusProbe::Start(void)
 		pthread_create( &m_ReceivingThread, NULL, &CFroniusProbe::ReceivingFunction,  &RecArgs);
 
 	// Check for inverters. If none is found, stop the process
-	if(probeInverters() == false)
+	if(m_connected.empty() == true)
 	{
-		Stop();
-		return false;
+		if(probeInverters() == false)
+		{
+			Stop();
+			return false;
+		}
 	}
 
 	// All is well.
