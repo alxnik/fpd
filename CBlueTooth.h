@@ -35,7 +35,7 @@ public:
 
 	int 			Send(uint8_t *message, int length);
 	int 			Receive(uint8_t *message, int length, time_t timeout);
-	const bdaddr_t*	GetLocalMac(void);
+	string			GetMyAddress(void);
 private:
 
 	string 		m_host;

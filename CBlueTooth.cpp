@@ -115,9 +115,9 @@ CBlueTooth::Receive(uint8_t *message, int length, time_t timeout)
 	return rv;
 }
 
-const bdaddr_t*
-CBlueTooth::GetLocalMac(void)
+string
+CBlueTooth::GetMyAddress(void)
 {
-	return &m_LocalAddr;
+	//return &m_LocalAddr;
 }
 
