@@ -38,6 +38,9 @@ public:
 
 	int 			Send(uint8_t *message, int length);
 	int 			Receive(uint8_t *message, int length, time_t timeout);
+
+	// FIXME Add a function to this
+	string			GetMyAddress(void) { return "";};
 private:
 
 	string 		m_host;
