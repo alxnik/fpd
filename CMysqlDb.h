@@ -49,6 +49,8 @@ private:
 	string			m_user;
 	string			m_pass;
 	string			m_db;
+	string			m_table;
+
 };
 
 #endif /* CMysqlDb_H_ */

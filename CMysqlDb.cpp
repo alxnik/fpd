@@ -16,6 +16,7 @@ CMysqlDb::CMysqlDb(map<string, string> settings)
 	m_user 	= settings["user"];
 	m_pass 	= settings["pass"];
 	m_db 	= settings["db"];
+	m_table = settings["table"];
 	m_port 	= atoi(settings["port"].c_str());
 
    	mysql_init(&m_conn);
@@ -70,7 +71,6 @@ CMysqlDb::Connect(void)
    	}
 }
 
-
 int
 CMysqlDb::Insert(DataContainer &Data)
 {
@@ -110,7 +110,7 @@ CMysqlDb::Insert(DataContainerList &DataList)
 			}
 		}
 
-		string query = "INSERT IGNORE INTO InverterData " + ColumnsString + " VALUES " + ValuesString + ";";
+		string query = "INSERT IGNORE INTO " + m_table + " " + ColumnsString + " VALUES " + ValuesString + ";";
 		pthread_mutex_lock(&queryMutex);
 
 		/* send SQL query */
