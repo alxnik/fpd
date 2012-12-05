@@ -12,13 +12,17 @@
 #include "in_smadata2plus_structs.h"
 
 
-CSmaProbe::CSmaProbe(CBlueTooth *Connection, string uuid)
+CSmaProbe::CSmaProbe(CInterface *Iface, string uuid)
 {
-	m_Connection = Connection;
+	m_Connection = Iface;
 	m_packetCount = 0;
-
 }
-
+// FIXME
+CSmaProbe::CSmaProbe(CInterface *Iface, list<int> sensors, string uuid)
+{
+	m_Connection = Iface;
+	m_packetCount = 0;
+}
 CSmaProbe::~CSmaProbe()
 {
 	Stop();
@@ -41,7 +45,8 @@ CSmaProbe::Login(void)
 
 	s.cmd_code = CMDCODE_LEVEL2;
 	memset(s.dest, 0xff, 6);
-	memcpy(s.src, m_Connection->GetLocalMac(), 6);
+	// FIXME
+	//memcpy(s.src, m_Connection->GetLocalMac(), 6);
 
 	/* Set Layer 2 */
 	s2.ctrl1 = 0x0e;
@@ -105,7 +110,8 @@ CSmaProbe::Start(void)
 	/* Set destination */
 	memcpy(s.dest, p.src, 6);
 	/* Set my address */
-	memcpy(s.src, m_Connection->GetLocalMac(), 6);
+	// FIXME
+	//memcpy(s.src, m_Connection->GetLocalMac(), 6);
 
 	uint16_t len = 0;
 	/* Copy content for Broadcast */
@@ -132,7 +138,8 @@ CSmaProbe::Start(void)
 	// Get Level 1 packet ready
 	s.cmd_code = CMDCODE_LEVEL2;
 	memset(s.dest, 0xff, 6);
-	memcpy(s.src, m_Connection->GetLocalMac(), 6);
+	// FIXME
+	//memcpy(s.src, m_Connection->GetLocalMac(), 6);
 
 	// Set Level 2 packet. I have NO idea what these are
 	s2.ctrl1 = 0x09;
@@ -164,7 +171,8 @@ CSmaProbe::Start(void)
 
 	s.cmd_code = CMDCODE_LEVEL2;
 	memset(s.dest, 0xff, 6);
-	memcpy(s.src, m_Connection->GetLocalMac(), 6);
+	// FIXME
+	//memcpy(s.src, m_Connection->GetLocalMac(), 6);
 	/* Set Layer 2 */
 	s2.ctrl1 = 0x08;
 	s2.ctrl2 = 0xa0;
@@ -374,8 +382,9 @@ CSmaProbe::Level2Write(uint8_t * buffer, struct smadata2_l2_packet *p)
 	if (!memcmp(p->dest,null_addr,6))
 		memset(p->dest,0xff,6);
 
-	if (!memcmp(p->src,null_addr,6))
-		memcpy(p->src, m_Connection->GetLocalMac(), 6);
+	// FIXME
+	//if (!memcmp(p->src,null_addr,6))
+	//	memcpy(p->src, m_Connection->GetLocalMac(), 6);
 	/** Packet Header **/
 
 

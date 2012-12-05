@@ -17,7 +17,8 @@
 class CSmaProbe : public CProbe
 {
 public:
-	CSmaProbe(CBlueTooth *Connection, string uuid);
+	CSmaProbe(CInterface *Iface, string uuid);
+	CSmaProbe(CInterface *Iface, list<int> sensors,string uuid);
 	virtual ~CSmaProbe();
 
 	int Start(void);
@@ -43,7 +44,7 @@ private:
 	int			Level2Write(uint8_t * buffer, struct smadata2_l2_packet *p);
 
 
-	CBlueTooth *m_Connection;
+	CInterface *m_Connection;
 	uint8_t		m_packetCount;
 
 };
