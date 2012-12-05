@@ -91,6 +91,7 @@ CSerial::int2speed(int speed)
 		case 38400:
 			return B38400;
 	}
+	return 0;
 }
 
 CSerial::~CSerial()
@@ -249,4 +250,5 @@ CSerial::Receive(uint8_t *message, int length, time_t timeout)
 		else
 			return true;
 	}
+	return false;
 }

@@ -28,11 +28,13 @@ public:
 
 	virtual ~CSerial();
 
-	int	Connect(void);
-	int Disconnect(void);
+	int				Connect(void);
+	int 			Disconnect(void);
 
-	int Send(uint8_t *message, int length);
-	int Receive(uint8_t *message, int length, time_t timeout);
+	int 			Send(uint8_t *message, int length);
+	int 			Receive(uint8_t *message, int length, time_t timeout);
+	// Serials do not have addresses
+	string			GetMyAddress(void) { return "";};
 
 private:
 	int Lock(string device);
