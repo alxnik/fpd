@@ -75,7 +75,7 @@ CSettings::ParseInputs(XMLElement *Inputs)
 			if(iSets->Value() || iSets->ToElement()->GetText())
 			{
 				InputParse.ifaceSettings[iSets->Value()] = iSets->ToElement()->GetText();
-				syslog(LOG_INFO, "parsed [%s]=[%s]", iSets->Value(), InputParse.ifaceSettings[iSets->Value()].c_str());
+				Log.debug("parsed [%s]=[%s]", iSets->Value(), InputParse.ifaceSettings[iSets->Value()].c_str());
 			}
 
 			iSets = iSets->NextSibling();
@@ -95,12 +95,12 @@ CSettings::ParseInputs(XMLElement *Inputs)
 		}
 		InputsDB.push_back(InputParse);
 
-		syslog(LOG_INFO, "Parsed %s (%s - %s) with %d sensors\n", InputParse.uuid.c_str(), InputParse.type.c_str(),
+		Log.debug("Parsed %s (%s - %s) with %d sensors\n", InputParse.uuid.c_str(), InputParse.type.c_str(),
 				InputParse.iface.c_str(), NumOfSensors);
 
 		Input = Input->NextSiblingElement("input");
 	}
-	syslog(LOG_INFO, "Parsed %d inputs\n", NumberOfInputs);
+	Log.debug("Parsed %d inputs\n", NumberOfInputs);
 
 	return true;
 }
@@ -119,7 +119,7 @@ CSettings::ParseOutputs(XMLElement *Outputs)
 
 		if(!Output->Attribute("name"))
 		{
-			syslog(LOG_ERR, "Output entry has no name\n");
+			Log.error("Output entry has no name\n");
 			return false;
 		}
 
@@ -129,7 +129,7 @@ CSettings::ParseOutputs(XMLElement *Outputs)
 		{
 			if(OutputParse.name.compare((*i).name) == 0)
 			{
-				syslog(LOG_ERR, "Duplicate output name\n");
+				Log.error("Duplicate output name [%s]\n", OutputParse.name.c_str());
 				return false;
 			}
 		}
@@ -141,10 +141,10 @@ CSettings::ParseOutputs(XMLElement *Outputs)
 
 		while(OutSettings)
 		{
-			if(OutSettings->Value() || OutSettings->ToElement()->GetText())
+			if(OutSettings->Value() && OutSettings->ToElement()->GetText())
 			{
 				OutputParse.settings[OutSettings->Value()] = OutSettings->ToElement()->GetText();
-				syslog(LOG_INFO, "parsed [%s]=[%s]", OutSettings->Value(), OutputParse.settings[OutSettings->Value()].c_str());
+				Log.debug("parsed [%s]=[%s]", OutSettings->Value(), OutputParse.settings[OutSettings->Value()].c_str());
 			}
 
 			OutSettings = OutSettings->NextSibling();
@@ -156,7 +156,7 @@ CSettings::ParseOutputs(XMLElement *Outputs)
 	}
 
 
-	syslog(LOG_INFO, "Parsed %d outputs\n", NumberOfOutputs);
+	Log.log("Parsed %d outputs\n", NumberOfOutputs);
 
 	return true;
 }
@@ -171,7 +171,7 @@ CSettings::OpenFile(void)
 
 	if(m_SettingsFile->LoadFile(m_FileName.c_str()) != XML_NO_ERROR)
 	{
-		syslog(LOG_ERR, "Error Opening %s: %d\n", m_FileName.c_str(), m_SettingsFile->ErrorID());
+		Log.error("Error Opening %s: %d\n", m_FileName.c_str(), m_SettingsFile->ErrorID());
 
 		delete m_SettingsFile;
 		m_SettingsFile = 0;
