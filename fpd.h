@@ -59,6 +59,8 @@ public:
 	virtual int GetAverage(DataContainer &AverageData) = 0;
 	virtual list<int> GetConnectedInverters(void) = 0;
 	virtual int ResetStack(void) = 0;
+
+	map<int, string> outputs;
 };
 
 // Generic class of the hardware interfaces
@@ -72,6 +74,8 @@ public:
 
 	virtual int Send(uint8_t *message, int length) = 0;
 	virtual int Receive(uint8_t *message, int length, time_t timeout) = 0;
+
+	virtual string	GetMyAddress(void) = 0;
 };
 
 // Generic class of the outputs

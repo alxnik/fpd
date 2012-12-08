@@ -9,15 +9,24 @@
  */
 
 #include "fpd.h"
+
+#include "CLog.h"
+#include "CSettings.h"
+
+// Output modules
 #include "CMysqlDb.h"
 #include "CXMLDb.h"
-#include "CLog.h"
+
+// Interface modules
 #include "CSerial.h"
 #include "CSocket.h"
-#include "CScanner.h"
+#include "CBlueTooth.h"
+
+// Parser modules
 #include "CSolutronicProbe.h"
-#include "CSettings.h"
 #include "CSmaProbe.h"
+#include "CFroniusProbe.h"
+#include "CSunergyProbe.h"
 
 #include <signal.h>
 
@@ -92,9 +101,7 @@ CInterface* StartInterface(InputContainer *inp)
 		iface = dynamic_cast<CInterface *> (bt);
 	}
 	else
-	{
-		syslog(LOG_ERR, "Unsupported Interface requested\n");
-	}
+		Log.error("Unsupported Interface requested\n");
 
 	return iface;
 }
@@ -114,8 +121,8 @@ CProbe* StartProbe(InputContainer *inp, CInterface* iface)
 	}
 	else if(!inp->type.compare("sma"))
 	{
-		//CSmaProbe *SProbe = new CSmaProbe(iface, CurInput->uuid);
-		//Probe = dynamic_cast<CProbe *> (SProbe);
+		CSmaProbe *SProbe = new CSmaProbe(iface, inp->uuid);
+		Probe = dynamic_cast<CProbe *> (SProbe);
 	}
 	else if(!inp->type.compare("solutronic"))
 	{
@@ -123,9 +130,7 @@ CProbe* StartProbe(InputContainer *inp, CInterface* iface)
 		Probe = dynamic_cast<CProbe *> (SProbe);
 	}
 	else
-	{
-		syslog(LOG_ERR, "Unsupported Probe requested\n");
-	}
+		Log.error("Unsupported Probe requested\n");
 
 	return Probe;
 }
@@ -147,14 +152,8 @@ int main(int argc, char *argv[])
 
     Log.Init();
 
-    // VER is set by the makefile and contains the svn revision number
-#ifdef VER
-    string Revision = VER;
-#else
-    string Revision = "Unknown";
-#endif
 
-    syslog(LOG_INFO, "SolarSpy Probe Daemon %d.%d (rev %s) Starting...", MAJOR_VERSION, MINOR_VERSION, Revision.c_str());
+    Log.log("SolarSpy Probe Daemon %d.%d Starting...", MAJOR_VERSION, MINOR_VERSION);
 
     // Daemonize!
     if(debugFlag == false)
@@ -172,7 +171,7 @@ int main(int argc, char *argv[])
     	sid = setsid();
     	if (sid < 0)
     	{
-    		syslog(LOG_ERR, "Cannot set SID");
+    		Log.error("Cannot set SID");
     		return -1;
     	}
 
@@ -189,7 +188,7 @@ int main(int argc, char *argv[])
 
     if( sigaction (SIGINT, &new_action, NULL) == -1 || sigaction (SIGTERM, &new_action, NULL) == -1)
     {
-    	syslog(LOG_ERR, "Failed to register Signal Handlers, Exiting");
+    	Log.error("Failed to register Signal Handlers, Exiting");
     	return(EXIT_FAILURE);
     }
 
@@ -199,13 +198,13 @@ int main(int argc, char *argv[])
 
     if(!Settings.LoadFile("settings.xml"))
     {
-        syslog(LOG_ERR, "Error reading settings\n");
+        Log.error("Error reading settings\n");
 		return(EXIT_FAILURE);
     }
 
-    syslog(LOG_INFO, "Loaded Settings file\n");
+    Log.log("Loaded Settings file\n");
     list<CProbe*> Inputs;
-    list<COutput*> Outputs;
+    map<string, COutput*> Outputs;
 
 
     // Parse and start the outputs
@@ -213,10 +212,10 @@ int main(int argc, char *argv[])
 	{
 		COutput *out = StartOutput(&(*CurOutput));
 		if(out)
-			Outputs.push_back(out);
+			Outputs[CurOutput->name] = out;
 		else
 		{
-			syslog(LOG_ERR, "Failed to start output [%s]\n", CurOutput->name.c_str());
+			Log.error("Failed to start output [%s]\n", CurOutput->name.c_str());
 			continue;
 		}
 	}
@@ -227,22 +226,109 @@ int main(int argc, char *argv[])
 		// Start The interface first
 		CInterface *iface = StartInterface(&(*CurInput));
 
-		if(!iface || !iface->Connect())
+		if(!iface)
 		{
-			syslog(LOG_ERR, "Failed to start interface [%s]\n", CurInput->uuid.c_str());
+			Log.error("Failed to initialize interface [%s]\n", CurInput->uuid.c_str());
+			continue;
+		}
+		if(!iface->Connect())
+		{
+			Log.error("Failed to start interface [%s]\n", CurInput->uuid.c_str());
 			continue;
 		}
 
+
 		// And pass it to the probe
 		CProbe *Probe = StartProbe(&(*CurInput),iface);
+
 		if(!Probe || !Probe->Start())
 		{
-			syslog(LOG_ERR, "Failed to start probe [%s]\n", CurInput->uuid.c_str());
+			Log.error("Failed to start probe [%s]\n", CurInput->uuid.c_str());
 			delete iface;
 			continue;
 		}
+
+		Probe->outputs = (*CurInput).outputs;
+		Inputs.push_back(Probe);
+
 	}
-	sleep(5);
+
+	if(Inputs.empty() == true)
+	{
+		Log.error("No running inputs. Exiting\n");
+		return -1;
+	}
+	if(Outputs.empty() == true)
+	{
+		Log.error("No running outputs. Exiting\n");
+		return -1;
+	}
+	// By now, we have:
+	//	opened the interfaces
+	//	inited and started the parsers
+	//	inited the output modules.
+	// Now we have to handle the message flow from input to output in standard intervals as defined in the settings
+	while(true)
+	{
+		struct tm *ptr;
+		time_t TimeStamp;
+
+		TimeStamp = time(NULL);
+		ptr = localtime((const time_t *) &TimeStamp);
+		if(ptr->tm_sec == 0)
+		{
+			Log.debug("Collecting data\n");
+			for(list<CProbe*>::iterator CurProbe = Inputs.begin(); CurProbe != Inputs.end(); ++CurProbe)
+			{
+				list<int> Sensors = (*CurProbe)->GetConnectedInverters();
+				for(list<int>::iterator CurSensor = Sensors.begin();CurSensor != Sensors.end(); ++CurSensor)
+				{
+					DataContainer Results;
+					Results["TimeStamp"] = int2string(TimeStamp);
+
+					// By default, start with non-responsive status and work the way from there
+					Results["status"] = "5";
+					Results["inverter"] = int2string(*CurSensor);
+
+					if((*CurProbe)->GetAverage(Results) == false)
+						Log.warn("Non responsive Inverter %s\n", Results["inverter"].c_str());
+
+
+					// Start running through the list of outputs until the insert suceeds
+					for(int i=0; ; i++)
+					{
+						if((*CurProbe)->outputs[i].compare("") == 0)
+						{
+							Log.error("Could not output data\n");
+							break;
+						}
+						string CurrOutput = (*CurProbe)->outputs[i];
+						if(Outputs[CurrOutput]->Insert(Results) == true)
+							break;
+					}
+				}
+			}
+
+			// Wait for the second to finish so that we process only one time
+			do
+			{
+				TimeStamp = time(NULL);
+				ptr = localtime((const time_t *) &TimeStamp);
+				if(ptr->tm_sec == 0)
+					usleep(100000);
+			} while(ptr->tm_sec == 0);
+		}
+		usleep(30000);
+		if(SigTermFlag == true)
+			break;
+	}
+
+	// We are done. Delete all the objects in order to run their destructors
+	for (list<CProbe*>::iterator obj = Inputs.begin(); obj != Inputs.end(); obj++)
+		delete *(obj);
+
+	for (map<string, COutput*>::iterator obj = Outputs.begin(); obj != Outputs.end(); obj++)
+		delete obj->second;
 
 	return 0;
 }
