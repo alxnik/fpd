@@ -19,7 +19,7 @@
 #include <string>
 using namespace std;
 
-class CSerial //: public CInterface
+class CSerial : public CInterface
 {
 public:
 	CSerial(map<string,string>	settings);
