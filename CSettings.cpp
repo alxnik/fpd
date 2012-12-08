@@ -93,10 +93,24 @@ CSettings::ParseInputs(XMLElement *Inputs)
 			InputParse.sensors.push_back(atol(Sensor->Attribute("address")));
 			Sensor = Sensor->NextSiblingElement("sensor");
 		}
+
+		XMLElement *Output = Input->FirstChildElement("outputs")->FirstChildElement("output");
+		int NumOfOutputs = 0;
+		while(Output)
+		{
+			if(!Output->Attribute("name") || !Output->Attribute("priority"))
+				return false;
+			NumOfOutputs++;
+			InputParse.outputs[atoi(Output->Attribute("priority"))] = Output->Attribute("name");
+
+			Output = Output->NextSiblingElement("output");
+		}
+
+
 		InputsDB.push_back(InputParse);
 
-		Log.debug("Parsed %s (%s - %s) with %d sensors\n", InputParse.uuid.c_str(), InputParse.type.c_str(),
-				InputParse.iface.c_str(), NumOfSensors);
+		Log.debug("Parsed %s (%s - %s) with %d sensors, %d outputs\n", InputParse.uuid.c_str(), InputParse.type.c_str(),
+				InputParse.iface.c_str(), NumOfSensors, NumOfOutputs);
 
 		Input = Input->NextSiblingElement("input");
 	}

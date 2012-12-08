@@ -31,6 +31,7 @@ typedef struct
 
 	map<string, string>		ifaceSettings;
 	list<int> 				sensors;
+	map<int, string>		outputs;
 } InputContainer;
 
 typedef struct
