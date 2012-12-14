@@ -33,7 +33,6 @@ public:
 
 private:
 	bool probeInverters(void);
-	bool probeStaticValues(void);
 
 	// Constructs and sends a message to the inverter network
 	static int SendMessage(CInterface *Interface, uint16_t src, uint16_t dest, uint16_t Command, bool rw, bool proto, uint8_t *data, uint16_t length);
@@ -56,6 +55,7 @@ private:
 	pthread_t m_SendingThread;
 	pthread_t m_ReceivingThread;
 
+	string m_Uuid;
 
 	CInterface *m_Interface;
 

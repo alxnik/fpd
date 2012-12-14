@@ -16,6 +16,7 @@ CSolutronicProbe::CSolutronicProbe(CInterface *Iface, string uuid)
 {
 	m_Interface = Iface;
 	m_SendingThread = m_ReceivingThread = 0;
+	m_Uuid = uuid;
 
 	pthread_mutex_init(&m_queueMutex, NULL);
 }
@@ -24,6 +25,7 @@ CSolutronicProbe::CSolutronicProbe(CInterface *Iface, list<int> sensors, string 
 {
 	m_Interface = Iface;
 	m_SendingThread = m_ReceivingThread = 0;
+	m_Uuid = uuid;
 
 	m_connected = sensors;
 
@@ -78,12 +80,6 @@ CSolutronicProbe::probeInverters(void)
 list<int>
 CSolutronicProbe::GetConnectedInverters(void)
 {
-	// Save the old list. If the probe fails, restore the old one
-	list<int> ConnectedProbes = m_connected;
-
-	if(probeInverters() == false)
-		m_connected = ConnectedProbes;
-
 	return m_connected;
 }
 
@@ -155,8 +151,105 @@ CSolutronicProbe::Stop(void)
 int
 CSolutronicProbe::GetAverage(DataContainer &AverageData)
 {
-	return false;
+	int inverterId = atoi(AverageData["inverter"].c_str());
+
+	bool rv = true;
+
+	if(m_MsgQueue.size() == 0)
+	{
+		syslog(LOG_ERR, "No messages in Queue\n");
+		return false;
+	}
+
+	uint32_t u32;
+
+	if(RetreiveFromStack(inverterId, SOL_CMD_VOLTAGE_AC, &u32) == false)
+		rv = false;
+	else
+		AverageData["voltageAC"] = int2string(u32);
+
+	if(RetreiveFromStack(inverterId, SOL_CMD_VOLTAGE_DC, &u32) == false)
+		rv = false;
+	else
+		AverageData["voltageDC"] = int2string(u32);
+
+	if(RetreiveFromStack(inverterId, SOL_CMD_CURRENT_AC, &u32) == false)
+		rv = false;
+	else
+		AverageData["currentAC"] = int2string(u32);
+
+	if(RetreiveFromStack(inverterId, SOL_CMD_CURRENT_DC, &u32) == false)
+		rv = false;
+	else
+		AverageData["currentDC"] = int2string(u32);
+
+//	if(RetreiveFromStack(inverterId, SOL_CMD_POWER_AC, &u32) == false)
+//		rv = false;
+//	else
+//		AverageData["power"] = int2string(u32);
+
+	if(RetreiveFromStack(inverterId, SOL_CMD_POWER_DC, &u32) == false)
+		rv = false;
+	else
+		AverageData["power"] = int2string(u32);
+
+	if(RetreiveFromStack(inverterId, SOL_CMD_ENERGY_TODAY, &u32) == false)
+		rv = false;
+	else
+		AverageData["DailyEnergy"] = int2string(u32);
+
+	if(RetreiveFromStack(inverterId, SOL_CMD_ENERGY_TOTAL, &u32) == false)
+		rv = false;
+	else
+		AverageData["TotalEnergy"] = int2string(u32);
+
+	if(RetreiveFromStack(inverterId, SOL_CMD_FREQ_AC, &u32) == false)
+		rv = false;
+	else
+		AverageData["frequencyAC"] = int2string(u32 /100);
+
+	AverageData["status"] = "2";
+	AverageData["clientID"] = "\"" + m_Uuid + "\"";
+
+	return rv;
 }
+
+int
+CSolutronicProbe::RetreiveFromStack(int DeviceNumber, int Command, uint32_t *result)
+{
+	pthread_mutex_lock(&m_queueMutex);
+	std::list<struct MsgStruct>::iterator i = m_MsgQueue.begin();
+	uint64_t sum = 0;
+	uint16_t answers = 0;
+
+	while (i != m_MsgQueue.end())
+	{
+		uint16_t CurInv = ((uint16_t) i->Data[3] << 8) | ((uint16_t) i->Data[4]);
+		uint16_t CurCommand = (((uint16_t) i->Data[5] << 8) | (uint16_t) i->Data[6]) & 0x03FF;
+
+		if(CurInv == DeviceNumber && CurCommand == Command)
+		{
+			sum += (uint32_t) i->Data[7] << 24 | i->Data[8] << 16 | i->Data[9] << 8 | i->Data[10];
+			answers++;
+			i = m_MsgQueue.erase(i);
+		}
+		else
+			i++;
+	}
+	pthread_mutex_unlock(&m_queueMutex);
+
+	if(answers > 0)
+	{
+		*result = sum/answers;
+		return true;
+	}
+	else
+	{
+		*result = 0;
+		return false;
+	}
+}
+
 
 void *
 CSolutronicProbe::SendingFunction(void *ptr)
@@ -170,31 +263,31 @@ CSolutronicProbe::SendingFunction(void *ptr)
 		for(list<int>::iterator curInv=args.connected->begin();curInv!=args.connected->end(); ++curInv)
 		{
 			if(SendMessage(Interface, 0x0, *curInv, SOL_CMD_VOLTAGE_AC, READ, (uint32_t)0x0000) == false)
-				syslog(LOG_ERR, "Error sending VoltageAC Command");
+				Log.error("Error sending VoltageAC Command");
 			usleep(500000);
 			if(SendMessage(Interface, 0x0, *curInv, SOL_CMD_VOLTAGE_DC, READ, (uint32_t)0x0000) == false)
-				syslog(LOG_ERR, "Error sending VoltageDC Command");
+				Log.error("Error sending VoltageDC Command");
 			usleep(500000);
 			if(SendMessage(Interface, 0x0, *curInv, SOL_CMD_CURRENT_AC, READ, (uint32_t)0x0000) == false)
-				syslog(LOG_ERR, "Error sending CurrentAC Command");
+				Log.error("Error sending CurrentAC Command");
 			usleep(500000);
 			if(SendMessage(Interface, 0x0, *curInv, SOL_CMD_CURRENT_DC, READ, (uint32_t)0x0000) == false)
-				syslog(LOG_ERR, "Error sending CurrentDC Command");
+				Log.error("Error sending CurrentDC Command");
 			usleep(500000);
 			if(SendMessage(Interface, 0x0, *curInv, SOL_CMD_POWER_AC, READ, (uint32_t)0x0000) == false)
-				syslog(LOG_ERR, "Error sending PowerAC Command");
+				Log.error("Error sending PowerAC Command");
 			usleep(500000);
 			if(SendMessage(Interface, 0x0, *curInv, SOL_CMD_POWER_DC, READ, (uint32_t)0x0000) == false)
-				syslog(LOG_ERR, "Error sending PowerDC Command");
+				Log.error("Error sending PowerDC Command");
 			usleep(500000);
 			if(SendMessage(Interface, 0x0, *curInv, SOL_CMD_ENERGY_TODAY, READ, (uint32_t)0x0000) == false)
-				syslog(LOG_ERR, "Error sending EnergyDay Command");
+				Log.error("Error sending EnergyDay Command");
 			usleep(500000);
 			if(SendMessage(Interface, 0x0, *curInv, SOL_CMD_ENERGY_TOTAL, READ, (uint32_t)0x0000) == false)
-				syslog(LOG_ERR, "Error sending EnergyTotal Command");
+				Log.error("Error sending EnergyTotal Command");
 			usleep(500000);
 			if(SendMessage(Interface, 0x0, *curInv, SOL_CMD_FREQ_AC, READ, (uint32_t)0x0000) == false)
-				syslog(LOG_ERR, "Error sending FreqAC Command");
+				Log.error("Error sending FreqAC Command");
 			usleep(200000);
 		}
 	}
@@ -268,8 +361,8 @@ CSolutronicProbe::ReceivingFunction(void *ptr)
 			// If we are here, we have a message. Push it up the queue
 			if(debugFlag == true)
 			{
-				syslog(LOG_INFO, "Message Received:\n");
-				Log.hexDump(LOG_DEBUG, CurrentMessage, MsgLen);
+				//syslog(LOG_INFO, "Message Received:\n");
+				//Log.hexDump(LOG_DEBUG, CurrentMessage, MsgLen);
 			}
 
 			// Push the message back to the message queue
@@ -342,8 +435,8 @@ CSolutronicProbe::SendMessage(CInterface *Interface, uint16_t src, uint16_t dest
 
     	if(debugFlag == true)
     	{
-    		syslog(LOG_INFO, "Sending msg:\n");
-    		Log.hexDump(LOG_DEBUG, message, length + 9);
+    		//syslog(LOG_INFO, "Sending msg:\n");
+    		//Log.hexDump(LOG_DEBUG, message, length + 9);
     	}
 
     	if(!Interface->Send(message, length + 9))
