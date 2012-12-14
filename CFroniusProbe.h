@@ -53,6 +53,7 @@ private:
 	pthread_t m_SendingThread;
 	pthread_t m_ReceivingThread;
 
+	string m_Uuid;
 
 	CInterface *m_Interface;
 

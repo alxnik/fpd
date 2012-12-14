@@ -16,6 +16,7 @@ CFroniusProbe::CFroniusProbe(CInterface *SerialLine, string uuid)
 {
 	m_Interface = SerialLine;
 	m_SendingThread = m_ReceivingThread = 0;
+	m_Uuid = uuid;
 
 	pthread_mutex_init(&m_queueMutex, NULL);
 }
@@ -24,6 +25,7 @@ CFroniusProbe::CFroniusProbe(CInterface *SerialLine, list<int> sensors, string u
 {
 	m_Interface = SerialLine;
 	m_SendingThread = m_ReceivingThread = 0;
+	m_Uuid = uuid;
 
 	m_connected = sensors;
 
@@ -259,7 +261,7 @@ CFroniusProbe::GetAverage(DataContainer &AverageData)
 	else
 		AverageData["TotalEnergy"] = int2string(u64);
 
-
+	AverageData["clientID"] = "\"" + m_Uuid + "\"";
 
 	return rv;
 }
