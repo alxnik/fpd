@@ -60,16 +60,14 @@ COutput* StartOutput(OutputContainer *outp)
 {
 
 	COutput *out = 0;
-	if(outp->type.compare("mysql"))
+	if(!outp->type.compare("mysql"))
 	{
 		CMysqlDb *Mysql = new CMysqlDb(outp->settings);
-		Mysql->Connect();
 		out = dynamic_cast<COutput *> (Mysql);
 	}
-	else if(outp->type.compare("xml"))
+	else if(!outp->type.compare("xml"))
 	{
 		CXMLDb *xml = new CXMLDb(outp->settings);
-		xml->Connect();
 		out = dynamic_cast<COutput *> (xml);
 	}
 	else
@@ -211,13 +209,20 @@ int main(int argc, char *argv[])
 	for(list<OutputContainer>::iterator CurOutput=Settings.OutputsDB.begin();CurOutput!=Settings.OutputsDB.end(); ++CurOutput)
 	{
 		COutput *out = StartOutput(&(*CurOutput));
-		if(out)
-			Outputs[CurOutput->name] = out;
-		else
+		if(!out)
 		{
 			Log.error("Failed to start output [%s]\n", CurOutput->name.c_str());
 			continue;
+
 		}
+		if(!out->Connect())
+		{
+			Log.error("Failed to connect to output [%s]\n", CurOutput->name.c_str());
+			delete out;
+			continue;
+		}
+
+		Outputs[CurOutput->name] = out;
 	}
 
     // Parse and start the inputs
@@ -233,8 +238,10 @@ int main(int argc, char *argv[])
 		}
 		if(!iface->Connect())
 		{
-			Log.error("Failed to start interface [%s]\n", CurInput->uuid.c_str());
-			continue;
+			Log.error("Failed to connect to interface [%s]\n", CurInput->uuid.c_str());
+			// Don't stop the interface. Let it try to reconnect byitself later
+			//delete iface;
+			//continue;
 		}
 
 
@@ -244,23 +251,34 @@ int main(int argc, char *argv[])
 		if(!Probe || !Probe->Start())
 		{
 			Log.error("Failed to start probe [%s]\n", CurInput->uuid.c_str());
+			if(Probe)
+				delete Probe;
 			delete iface;
 			continue;
 		}
 
-		Probe->outputs = (*CurInput).outputs;
+		Probe->outputs.insert((*CurInput).outputs.begin(), (*CurInput).outputs.end());
+
 		Inputs.push_back(Probe);
 
 	}
 
-	if(Inputs.empty() == true)
+	if(Inputs.empty())
 	{
 		Log.error("No running inputs. Exiting\n");
+
+		for (map<string, COutput*>::iterator obj = Outputs.begin(); obj != Outputs.end(); obj++)
+			delete obj->second;
+
 		return -1;
 	}
-	if(Outputs.empty() == true)
+	if(Outputs.empty())
 	{
 		Log.error("No running outputs. Exiting\n");
+
+		for (list<CProbe*>::iterator obj = Inputs.begin(); obj != Inputs.end(); obj++)
+			delete *(obj);
+
 		return -1;
 	}
 	// By now, we have:
@@ -277,10 +295,11 @@ int main(int argc, char *argv[])
 		ptr = localtime((const time_t *) &TimeStamp);
 		if(ptr->tm_sec == 0)
 		{
-			Log.debug("Collecting data\n");
+
 			for(list<CProbe*>::iterator CurProbe = Inputs.begin(); CurProbe != Inputs.end(); ++CurProbe)
 			{
 				list<int> Sensors = (*CurProbe)->GetConnectedInverters();
+
 				for(list<int>::iterator CurSensor = Sensors.begin();CurSensor != Sensors.end(); ++CurSensor)
 				{
 					DataContainer Results;
@@ -295,8 +314,9 @@ int main(int argc, char *argv[])
 
 
 					// Start running through the list of outputs until the insert suceeds
-					for(int i=0; ; i++)
+					for(int i=1; ; i++)
 					{
+
 						if((*CurProbe)->outputs[i].compare("") == 0)
 						{
 							Log.error("Could not output data\n");
@@ -319,6 +339,7 @@ int main(int argc, char *argv[])
 			} while(ptr->tm_sec == 0);
 		}
 		usleep(30000);
+		//sleep(1);
 		if(SigTermFlag == true)
 			break;
 	}

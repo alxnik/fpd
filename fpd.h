@@ -84,6 +84,7 @@ class COutput
 public:
 	virtual ~COutput(){};
 
+	virtual int Connect(void) = 0;
 	virtual int Insert(DataContainer &Data) = 0;
 	virtual int Insert(DataContainerList &DataList) = 0;
 
