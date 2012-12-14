@@ -13,8 +13,8 @@
 CMysqlDb::CMysqlDb(map<string, string> settings)
 {
 	m_host 	= settings["host"];
-	m_user 	= settings["user"];
-	m_pass 	= settings["pass"];
+	m_user 	= settings["username"];
+	m_pass 	= settings["password"];
 	m_db 	= settings["db"];
 	m_table = settings["table"];
 	m_port 	= atoi(settings["port"].c_str());
@@ -32,10 +32,16 @@ int
 CMysqlDb::Connect(void)
 {
 	if(m_host.length() == 0 || m_user.length() == 0 || m_pass.length() == 0 || m_db.length() == 0)
+	{
+		Log.error("Mysql Configuration error\n");
 		return false;
+	}
 
 	if(!(m_port > 0 && m_port < 65536))
+	{
+		Log.error("Mysql Configuration error\n");
 		return false;
+	}
 
 	pthread_mutex_lock(&queryMutex);
 
@@ -60,12 +66,13 @@ CMysqlDb::Connect(void)
    	/* Connect to database */
    	if (!mysql_real_connect(&m_conn, m_host.c_str(), m_user.c_str(), m_pass.c_str(), m_db.c_str(), m_port, NULL, CLIENT_REMEMBER_OPTIONS))
    	{
-   		syslog(LOG_ERR, "Error connecting to %s: %s", m_host.c_str(), mysql_error(&m_conn));
+   		Log.error("Error connecting to %s: %s", m_host.c_str(), mysql_error(&m_conn));
    		pthread_mutex_unlock(&queryMutex);
    		return false;
    	}
    	else
    	{
+   		Log.log("Connected to database @[%s:%d] \n", m_host.c_str(), m_port);
    		pthread_mutex_unlock(&queryMutex);
    		return true;
    	}
@@ -118,12 +125,13 @@ CMysqlDb::Insert(DataContainerList &DataList)
 		{
 			int error = mysql_errno(&m_conn);
 			pthread_mutex_unlock(&queryMutex);
-			syslog(LOG_ERR, "MySQL Error (%d): %s", error, mysql_error(&m_conn));
+			Log.log("MySQL Error (%d): %s", error, mysql_error(&m_conn));
 
 			// Server error (fatal). Most probably because of a bug or something like that
 			// Discard the entry so the program doesn't stop sending data because of it
 			if(error >= 1000 && error < 2000)
 			{
+				Log.log("[%s]\n", query.c_str());
 				DataList.pop_front();
 				continue;
 			}
