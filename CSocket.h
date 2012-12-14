@@ -43,6 +43,8 @@ public:
 	string			GetMyAddress(void) { return "";};
 private:
 
+	int 			ReConnect(void);
+
 	string 		m_host;
 	uint16_t	m_port;
 	bool 		m_IsConnected;

@@ -32,7 +32,7 @@ CSocket::Connect(void)
 	if(m_host.empty())
 		return false;
 
-	syslog(LOG_INFO, "Connecting to %s:%d\n", m_host.c_str(), m_port);
+	Log.log("Connecting to %s:%d\n", m_host.c_str(), m_port);
 
 	m_Socket = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -60,9 +60,11 @@ CSocket::Connect(void)
 	int status = connect (m_Socket, (struct sockaddr *) &serveraddr, sizeof (serveraddr));
 	if (status < 0)
 	{
-		syslog(LOG_ERR, "Socket Connect error: %s\n", strerror(errno));
+		Log.error("Socket Connect error: %s\n", strerror(errno));
 		return false;
 	}
+
+	Log.log("Connected\n");
 
 	m_IsConnected = true;
 
@@ -71,9 +73,26 @@ CSocket::Connect(void)
 }
 
 int
+CSocket::ReConnect(void)
+{
+	if(m_IsConnected)
+		Disconnect();
+
+	int rv = Connect();
+
+	// In order to not spam the server with connection requests,
+	// if a reconnection fails, wait for a few seconds
+	if(rv == false)
+		sleep(5);
+
+	return rv;
+}
+
+int
 CSocket::Disconnect(void)
 {
 	close (m_Socket);
+	m_Socket = 0;
 	sleep(1);
 	m_IsConnected = false;
 	return true;
@@ -86,8 +105,10 @@ CSocket::Send(uint8_t *message, int length)
 
 	if(rv == -1)
 	{
-		syslog(LOG_ERR, "Socket write error: %s\n", strerror(errno));
-		return false;
+
+		Log.error("Socket write error: %s [%d]\n", strerror(errno), errno);
+		Log.log("Reconnecting\n");
+		return ReConnect();
 	}
 	else
 		return true;
@@ -103,11 +124,14 @@ CSocket::Receive(uint8_t *message, int length, time_t timeout)
 
 	while(true)
 	{
+
 		rv = read(m_Socket, message+p, length-p);
 
 		if(rv == -1)
 		{
-			syslog(LOG_ERR, "Socket read error: %s\n", strerror(errno));
+			Log.error("Socket read error: %s [%d]\n", strerror(errno), errno);
+			Log.log("Reconnecting\n");
+			ReConnect();
 			return rv;
 		}
 		else if(rv == 0 && p == 0)
