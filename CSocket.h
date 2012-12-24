@@ -49,6 +49,8 @@ private:
 	uint16_t	m_port;
 	bool 		m_IsConnected;
 	int 		m_Socket;
+
+	pthread_mutex_t m_SocketMutex;
 };
 
 #endif /* CSOCKET_H_ */

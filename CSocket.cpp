@@ -18,6 +18,8 @@ CSocket::CSocket(map<string, string> settings)
 	m_port = atoi(settings["port"].c_str());
 
 	m_Socket = 0;
+
+	pthread_mutex_init(&m_SocketMutex, NULL);
 }
 
 CSocket::~CSocket()
@@ -31,6 +33,13 @@ CSocket::Connect(void)
 {
 	if(m_host.empty())
 		return false;
+
+	pthread_mutex_lock(&m_SocketMutex);
+	if(m_IsConnected == true)
+	{
+		pthread_mutex_unlock(&m_SocketMutex);
+		return true;
+	}
 
 	Log.log("Connecting to %s:%d\n", m_host.c_str(), m_port);
 
@@ -49,6 +58,7 @@ CSocket::Connect(void)
         if (hostp == (struct hostent *) NULL)
         {
             close(m_Socket);
+            pthread_mutex_unlock(&m_SocketMutex);
             return false;
         }
 
@@ -61,6 +71,9 @@ CSocket::Connect(void)
 	if (status < 0)
 	{
 		Log.error("Socket Connect error: %s\n", strerror(errno));
+		close(m_Socket);
+		m_Socket = 0;
+		pthread_mutex_unlock(&m_SocketMutex);
 		return false;
 	}
 
@@ -68,6 +81,7 @@ CSocket::Connect(void)
 
 	m_IsConnected = true;
 
+	pthread_mutex_unlock(&m_SocketMutex);
 	return true;
 
 }
@@ -83,7 +97,7 @@ CSocket::ReConnect(void)
 	// In order to not spam the server with connection requests,
 	// if a reconnection fails, wait for a few seconds
 	if(rv == false)
-		sleep(5);
+		sleep(30);
 
 	return rv;
 }
@@ -91,16 +105,24 @@ CSocket::ReConnect(void)
 int
 CSocket::Disconnect(void)
 {
+	pthread_mutex_lock(&m_SocketMutex);
+
 	close (m_Socket);
 	m_Socket = 0;
 	sleep(1);
 	m_IsConnected = false;
+
+	pthread_mutex_unlock(&m_SocketMutex);
 	return true;
 }
 
 int
 CSocket::Send(uint8_t *message, int length)
 {
+
+	if(m_IsConnected == false && ReConnect() == false)
+		return false;
+
 	int rv = write(m_Socket, message, length);
 
 	if(rv == -1)
@@ -117,6 +139,9 @@ CSocket::Send(uint8_t *message, int length)
 int
 CSocket::Receive(uint8_t *message, int length, time_t timeout)
 {
+	if(m_IsConnected == false && ReConnect() == false)
+		return false;
+
 	int rv = 0;
 	int p = 0;
 
@@ -124,7 +149,6 @@ CSocket::Receive(uint8_t *message, int length, time_t timeout)
 
 	while(true)
 	{
-
 		rv = read(m_Socket, message+p, length-p);
 
 		if(rv == -1)
