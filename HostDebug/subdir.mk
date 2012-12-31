@@ -17,6 +17,7 @@ CPP_SRCS += \
 ../CSolutronicProbe.cpp \
 ../CSunergyProbe.cpp \
 ../CXMLDb.cpp \
+../cnv.cpp \
 ../fpd.cpp 
 
 OBJS += \
@@ -33,6 +34,7 @@ OBJS += \
 ./CSolutronicProbe.o \
 ./CSunergyProbe.o \
 ./CXMLDb.o \
+./cnv.o \
 ./fpd.o 
 
 CPP_DEPS += \
@@ -49,6 +51,7 @@ CPP_DEPS += \
 ./CSolutronicProbe.d \
 ./CSunergyProbe.d \
 ./CXMLDb.d \
+./cnv.d \
 ./fpd.d 
 
 
