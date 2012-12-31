@@ -12,7 +12,7 @@
 
 
 #define MAJOR_VERSION 2
-#define MINOR_VERSION 6
+#define MINOR_VERSION 7
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -60,7 +60,8 @@ public:
 	virtual list<int> GetConnectedInverters(void) = 0;
 	virtual int ResetStack(void) = 0;
 
-	map<int, string> outputs;
+	string output;
+	string cache;
 };
 
 // Generic class of the hardware interfaces
