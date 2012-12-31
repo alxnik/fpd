@@ -94,23 +94,20 @@ CSettings::ParseInputs(XMLElement *Inputs)
 			Sensor = Sensor->NextSiblingElement("sensor");
 		}
 
-		XMLElement *Output = Input->FirstChildElement("outputs")->FirstChildElement("output");
-		int NumOfOutputs = 0;
-		while(Output)
-		{
-			if(!Output->Attribute("name") || !Output->Attribute("priority"))
-				return false;
-			NumOfOutputs++;
-			InputParse.outputs[atoi(Output->Attribute("priority"))] = Output->Attribute("name");
+		XMLElement *Output = Input->FirstChildElement("output");
+		if(!Output || !Output->Attribute("name"))
+			return false;
 
-			Output = Output->NextSiblingElement("output");
-		}
-
+		InputParse.output = Output->Attribute("name");
+		if(Output->Attribute("cache"))
+			InputParse.cache = Output->Attribute("cache");
+		else
+			Log.warn("No cache db set. This is not recommended\n");
 
 		InputsDB.push_back(InputParse);
 
-		Log.debug("Parsed %s (%s - %s) with %d sensors, %d outputs\n", InputParse.uuid.c_str(), InputParse.type.c_str(),
-				InputParse.iface.c_str(), NumOfSensors, NumOfOutputs);
+		Log.debug("Parsed %s (%s - %s) with %d sensors\n", InputParse.uuid.c_str(), InputParse.type.c_str(),
+				InputParse.iface.c_str(), NumOfSensors);
 
 		Input = Input->NextSiblingElement("input");
 	}
