@@ -43,6 +43,7 @@ CXMLDb::Insert(DataContainerList &DataList)
 
 	if(!LoadBackupFile())
 	{
+		Log.error("Unable to Load XML file\n");
 		pthread_mutex_unlock(&FileMutex);
 		return false;
 	}
@@ -51,7 +52,6 @@ CXMLDb::Insert(DataContainerList &DataList)
 	{
 		DataContainer Data = DataList.front();
 
-		syslog(LOG_INFO, "Pushing element\n");
 		XMLNode *ProbeData = m_BackupFile->NewElement("pd");
 
 		for( DataContainer::iterator ii=Data.begin(); ii!=Data.end(); ++ii)
@@ -67,6 +67,7 @@ CXMLDb::Insert(DataContainerList &DataList)
 
 	if(!SaveBackupFile())
 	{
+		Log.error("Unable to save XML file\n");
 		pthread_mutex_unlock(&FileMutex);
 		return false;
 	}
@@ -74,6 +75,7 @@ CXMLDb::Insert(DataContainerList &DataList)
 	pthread_mutex_unlock(&FileMutex);
 	return true;
 }
+
 int
 CXMLDb:: Restore(DataContainer &Data)
 {
@@ -169,7 +171,7 @@ CXMLDb::SaveBackupFile(void)
 	if(!m_BackupFile)
 		return false;
 
-	if(!m_BackupFile->SaveFile(m_FileName.c_str()))
+	if(m_BackupFile->SaveFile(m_FileName.c_str()))
 		return false;
 
 	return true;
