@@ -5,7 +5,7 @@ It mainly supports fronius inverters and output to mysql, however its modular de
 
 With minor adjustments it can be used as a general purpose data acquisition tool
 
-In order to compile go to ./Debug and make clean && make all
+In order to compile go to Debug/ and "make clean && make all"
 
 Required libraries
 	* libudev
