@@ -180,8 +180,8 @@ CSerial::Lock(string device)
 	FILE *lockFile;
 	if ( (lockFile = fopen(fullpath.c_str(), "w" )) )
 	{
-		return true;
 		fclose(lockFile);
+		return true;
 	}
 
 	return false;
